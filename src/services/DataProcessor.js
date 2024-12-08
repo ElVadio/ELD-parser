@@ -12,6 +12,9 @@ export class DataProcessor {
 
         return validatedEvents;
     }
+    
+}
+export default DataProcessor;
 
     extractEvents(pdfData) {
         return pdfData.map(record => ({
@@ -89,6 +92,6 @@ export class DataProcessor {
         return {
             events,
             violations
-        };
+        };  
     }
 }

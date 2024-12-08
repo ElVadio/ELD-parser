@@ -3,7 +3,12 @@ import EnhancedFMCSAChecker from './ELDCheckerService';
 import { getDocument } from 'pdfjs-dist';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.worker.entry';
 import './styles/ELDParser.css';
-import Timeline from './Timeline';
+import Timeline from './Timeline'
+import { DataProcessor } from './services/DataProcessor';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 
 
 // Set a specific version of PDF.js worker
@@ -17,6 +22,7 @@ const ELDParser = () => {
   const [error, setError] = useState(null);
   const [violations, setViolations] = useState(null);
 
+  
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
