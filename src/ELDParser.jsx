@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
-import EnhancedFMCSAChecker from './ELDCheckerService';
-import { getDocument } from 'pdfjs-dist';
-import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.worker.entry';
-import './styles/ELDParser.css';
-import Timeline from './Timeline'
+import { EnhancedFMCSAChecker } from './ELDCheckerService';
 import { DataProcessor } from './services/DataProcessor';
-import * as pdfjsLib from 'pdfjs-dist';
+import pdfjs from 'pdfjs-dist';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
+const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 
 // Set a specific version of PDF.js worker
 
 
 const ELDParser = () => {
+  useEffect(() => {
+    // Initialize PDF.js worker
+    const initPdfJs = async () => {
+        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    };
+    initPdfJs();
+}, []);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [parsedData, setParsedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
