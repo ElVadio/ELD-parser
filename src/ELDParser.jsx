@@ -5,7 +5,7 @@ import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.worker.entry';
 import './styles/ELDParser.css';
 import Timeline from './Timeline';
 
-GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
 // Set a specific version of PDF.js worker
 
 
@@ -43,9 +43,13 @@ const ELDParser = () => {
     const checker = new EnhancedFMCSAChecker();
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await getDocument(arrayBuffer).promise;
+      const loadingTask = getDocument({
+        data: arrayBuffer,
+        workerSrc: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
+      });
+      const pdf = await loadingTask.promise;
       const parsedRecords = await parsePDFContent(pdf);
-
+  
       const foundViolations = checker.checkAllViolations(parsedRecords);
       setViolations(foundViolations);
       setParsedData(parsedRecords);
