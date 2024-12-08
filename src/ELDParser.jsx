@@ -39,26 +39,26 @@ const ELDParser = () => {
       setIsProcessing(false);
     }
   };
-  const processFile = async (file) => {
-    const checker = new EnhancedFMCSAChecker();
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = getDocument({
-        data: arrayBuffer,
-        workerSrc: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
-      });
-      const pdf = await loadingTask.promise;
-      const parsedRecords = await parsePDFContent(pdf);
+  // Update in ELDParser.jsx
+const processFile = async (file) => {
+  const checker = new EnhancedFMCSAChecker();
+  const dataProcessor = new DataProcessor();
   
-      const foundViolations = checker.checkAllViolations(parsedRecords);
-      setViolations(foundViolations);
-      setParsedData(parsedRecords);
-    } catch (err) {
+  try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const parsedRecords = await parsePDFContent(pdf);
+      
+      // Process and validate data
+      const processedData = dataProcessor.processELDData(parsedRecords);
+      setParsedData(processedData.events);
+      setViolations(processedData.violations);
+      
+  } catch (err) {
       console.error('PDF Processing Error:', err);
       setError('Error processing file: ' + err.message);
-    }
-  };
-
+  }
+};
 
 
   const parsePDFContent = async (pdf) => {
