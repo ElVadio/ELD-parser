@@ -1,0 +1,21 @@
+/* Test file: src/test-styles.css */
+.test-flexbox {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+  }
+  
+  :root {
+    --test-color: #ff0000;
+  }
+  
+  .test-modern {
+    color: var(--test-color);
+    backdrop-filter: blur(10px);
+  }
