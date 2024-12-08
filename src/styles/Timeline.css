@@ -1,0 +1,28 @@
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .timeline-item {
+    position: relative;
+    padding-left: 30px;
+    border-left: 2px solid #ccc;
+  }
+  
+  .timeline-item:before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #007bff;
+  }
+  
+  .timeline-content {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+  }

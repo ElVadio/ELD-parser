@@ -3,6 +3,7 @@ import { EnhancedFMCSAChecker } from './ELDCheckerService';
 import { getDocument } from 'pdfjs-dist';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.worker.entry';
 import './styles/ELDParser.css';
+import Timeline from './Timeline';
 
 GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 // Set a specific version of PDF.js worker
@@ -255,6 +256,7 @@ const ELDParser = () => {
             {parsedData ? (
               <div className="visualization">
                 <h3>Timeline Visualization</h3>
+                <Timeline data={parsedData} />
                 {/* Add visualization implementation */}
               </div>
             ) : (
