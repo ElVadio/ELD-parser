@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EnhancedFMCSAChecker } from './ELDCheckerService';
+import EnhancedFMCSAChecker from './ELDCheckerService';
 import { getDocument } from 'pdfjs-dist';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.worker.entry';
 import './styles/ELDParser.css';

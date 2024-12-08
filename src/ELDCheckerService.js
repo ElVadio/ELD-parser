@@ -57,78 +57,114 @@ export const OnDutyType = {
     }
   
     checkAllViolations(records) {
-      return {
-        ...this.checkBasicHOSViolations(records),
-        ...this.checkOnDutyDurationViolations(records)
-      };
-    }
-  
-    checkOnDutyDurationViolations(records) {
-      const violations = {
-        pti_duration_violations: [],
-        loading_duration_violations: [],
-        missing_remark_violations: [],
-        multiple_violations: []
-      };
-  
-      const onDutyRecords = records.filter(r => r.status.toLowerCase() === 'on duty');
-      
-      for (const record of onDutyRecords) {
-        const durationMinutes = (record.endTime - record.startTime) / (1000 * 60);
-        const dutyType = this.identifyOnDutyType(record.remark);
-        
-        // Check violations based on type
-        this.checkViolationsByType(record, durationMinutes, dutyType, violations);
+      try {
+          const basicViolations = this.checkBasicHOSViolations(records);
+          const durationViolations = this.checkOnDutyDurationViolations(records);
+          return {
+              ...basicViolations,
+              ...durationViolations
+          };
+      } catch (error) {
+          console.error('Error in checkAllViolations:', error);
+          throw error;
       }
-  
-      return violations;
-    }
-  
-    identifyOnDutyType(remark) {
-      if (!remark) return OnDutyType.UNKNOWN;
-      
-      const remarkLower = remark.toLowerCase();
-      
-      for (const [dutyType, keywords] of Object.entries(this.ON_DUTY_KEYWORDS)) {
-        if (keywords.some(keyword => remarkLower.includes(keyword))) {
-          return dutyType;
-        }
-      }
-      
-      return OnDutyType.UNKNOWN;
-    }
-  
-    checkViolationsByType(record, duration, dutyType, violations) {
-      if (dutyType === OnDutyType.PTI && duration < this.MIN_PTI_TIME) {
-        violations.pti_duration_violations.push({
-          timestamp: record.startTime,
-          location: record.location,
-          duration: duration,
-          required: this.MIN_PTI_TIME,
-          remark: record.remark
-        });
-      } else if ([OnDutyType.DELIVERY, OnDutyType.PICKUP, OnDutyType.LOADING].includes(dutyType)) {
-        if (duration < this.MIN_LOADING_TIME) {
-          violations.loading_duration_violations.push({
-            timestamp: record.startTime,
-            location: record.location,
-            type: dutyType,
-            duration: duration,
-            required: this.MIN_LOADING_TIME,
-            remark: record.remark
-          });
-        }
-      }
-  
-      if (duration >= this.MIN_LOADING_TIME && dutyType === OnDutyType.UNKNOWN) {
-        violations.missing_remark_violations.push({
-          timestamp: record.startTime,
-          location: record.location,
-          duration: duration,
-          remark: record.remark || "No remark"
-        });
-      }
-    }
   }
-  
-  export default EnhancedFMCSAChecker;
+
+  checkBasicHOSViolations(records) {
+      const violations = {
+          driving_limit_violations: [],
+          on_duty_limit_violations: [],
+          off_duty_minimum_violations: [],
+          cycle_hours_violations: []
+      };
+
+      try {
+          if (!Array.isArray(records)) {
+              throw new Error('Records must be an array');
+          }
+
+          let drivingHours = 0;
+          let onDutyHours = 0;
+
+          records.forEach((record, index) => {
+              const duration = (record.endTime - record.startTime) / (1000 * 60 * 60);
+
+              // Check driving time violations
+              if (record.status === 'DRIVING') {
+                  drivingHours += duration;
+                  if (drivingHours > this.DRIVING_LIMIT) {
+                      violations.driving_limit_violations.push({
+                          timestamp: record.startTime,
+                          location: record.location,
+                          duration: duration,
+                          total_hours: drivingHours
+                      });
+                  }
+              }
+
+              // Check on-duty time violations
+              if (record.status === 'ON DUTY' || record.status === 'DRIVING') {
+                  onDutyHours += duration;
+                  if (onDutyHours > this.ON_DUTY_LIMIT) {
+                      violations.on_duty_limit_violations.push({
+                          timestamp: record.startTime,
+                          location: record.location,
+                          duration: duration,
+                          total_hours: onDutyHours
+                      });
+                  }
+              }
+          });
+
+          return violations;
+      } catch (error) {
+          console.error('Error in checkBasicHOSViolations:', error);
+          throw error;
+      }
+  }
+
+  checkOnDutyDurationViolations(records) {
+      const violations = {
+          pti_duration_violations: [],
+          loading_duration_violations: [],
+          missing_remark_violations: []
+      };
+
+      try {
+          records.forEach(record => {
+              if (record.status === 'ON DUTY') {
+                  const durationMinutes = (record.endTime - record.startTime) / (1000 * 60);
+                  
+                  // Check PTI violations
+                  if (record.remark?.toLowerCase().includes('pti') && 
+                      durationMinutes < this.MIN_PTI_TIME) {
+                      violations.pti_duration_violations.push({
+                          timestamp: record.startTime,
+                          location: record.location,
+                          duration: durationMinutes,
+                          required: this.MIN_PTI_TIME
+                      });
+                  }
+
+                  // Check loading/unloading violations
+                  if (record.remark?.toLowerCase().match(/load|unload|delivery|pickup/) && 
+                      durationMinutes < this.MIN_LOADING_TIME) {
+                      violations.loading_duration_violations.push({
+                          timestamp: record.startTime,
+                          location: record.location,
+                          duration: durationMinutes,
+                          required: this.MIN_LOADING_TIME
+                      });
+                  }
+              }
+          });
+
+          return violations;
+      } catch (error) {
+          console.error('Error in checkOnDutyDurationViolations:', error);
+          throw error;
+      }
+  }
+}
+
+export default EnhancedFMCSAChecker;
