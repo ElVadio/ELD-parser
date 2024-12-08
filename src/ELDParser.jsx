@@ -1,24 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EnhancedFMCSAChecker } from './ELDCheckerService';
 import { DataProcessor } from './services/DataProcessor';
-import pdfjs from 'pdfjs-dist';
-
-const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-
-// Set a specific version of PDF.js worker
-
+import * as pdfjsLib from 'pdfjs-dist';
 
 const ELDParser = () => {
-  useEffect(() => {
-    // Initialize PDF.js worker
-    const initPdfJs = async () => {
-        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-        pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    };
-    initPdfJs();
-}, []);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [parsedData, setParsedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -26,7 +11,14 @@ const ELDParser = () => {
   const [error, setError] = useState(null);
   const [violations, setViolations] = useState(null);
 
-  
+  useEffect(() => {
+    // Initialize PDF.js worker
+    const initializePdfWorker = async () => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    };
+    initializePdfWorker();
+  }, []);
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -49,27 +41,26 @@ const ELDParser = () => {
       setIsProcessing(false);
     }
   };
-  // Update in ELDParser.jsx
-const processFile = async (file) => {
-  const checker = new EnhancedFMCSAChecker();
-  const dataProcessor = new DataProcessor();
-  
-  try {
+
+  const processFile = async (file) => {
+    const checker = new EnhancedFMCSAChecker();
+    const processor = new DataProcessor();
+    
+    try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const parsedRecords = await parsePDFContent(pdf);
+      const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+      const pdf = await loadingTask.promise;
       
-      // Process and validate data
-      const processedData = dataProcessor.processELDData(parsedRecords);
+      const parsedRecords = await parsePDFContent(pdf);
+      const processedData = processor.processELDData(parsedRecords);
+      
       setParsedData(processedData.events);
       setViolations(processedData.violations);
-      
-  } catch (err) {
+    } catch (err) {
       console.error('PDF Processing Error:', err);
       setError('Error processing file: ' + err.message);
-  }
-};
-
+    }
+  };
 
   const parsePDFContent = async (pdf) => {
     try {
@@ -78,7 +69,6 @@ const processFile = async (file) => {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items.map(item => item.str).join(' ');
-        
         const pageRecords = extractRecordsFromText(pageText);
         records.push(...pageRecords);
       }
@@ -88,85 +78,43 @@ const processFile = async (file) => {
       throw new Error('Failed to extract content from PDF');
     }
   };
+
   const extractRecordsFromText = (text) => {
     const records = [];
     const lines = text.split('\n');
+    let currentDate = null;
 
     const timeRegex = /(\d{1,2}:\d{2}(?:am|pm)?)/i;
     const dateRegex = /(\d{1,2}\/\d{1,2}\/\d{4})/;
     const statusRegex = /(ON DUTY|OFF DUTY|DRIVING|SLEEPER)/i;
     const locationRegex = /\((.*?)\)/;
 
-    let currentDate = null;
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
+    lines.forEach(line => {
+      if (!line.trim()) return;
 
       const dateMatch = line.match(dateRegex);
       if (dateMatch) {
         currentDate = dateMatch[1];
-        continue;
+        return;
       }
 
-      const timeMatch = line.match(timeRegex);
-      const statusMatch = line.match(statusRegex);
-      const locationMatch = line.match(locationRegex);
+      const matches = {
+        time: line.match(timeRegex),
+        status: line.match(statusRegex),
+        location: line.match(locationRegex)
+      };
 
-      if (timeMatch && statusMatch) {
-        const startTime = timeMatch[1];
-        const status = statusMatch[1].toUpperCase();
-        const location = locationMatch ? locationMatch[1] : '';
-
-        const nextTimeMatch = line.match(new RegExp(timeRegex.source + '.*' + timeRegex.source));
-        let endTime = nextTimeMatch ? nextTimeMatch[2] : startTime;
-
+      if (matches.time && matches.status) {
         records.push({
-          startTime: new Date(`${currentDate} ${startTime}`),
-          endTime: new Date(`${currentDate} ${endTime}`),
-          status,
-          location,
-          vehicleId: extractVehicleId(line),
-          remark: extractRemark(line),
-          bolNumber: extractBOLNumber(line),
-          trailerNumber: extractTrailerNumber(line)
+          startTime: currentDate ? `${currentDate} ${matches.time[1]}` : matches.time[1],
+          status: matches.status[1],
+          location: matches.location ? matches.location[1] : '',
+          fullLocation: line
         });
       }
-    }
+    });
 
     return records;
-  };
-
-  const extractVehicleId = (line) => {
-    const vehiclePattern = /truck[:#\s]+(\w+)/i;
-    const match = line.match(vehiclePattern);
-    return match ? match[1] : '';
-  };
-
-  const extractRemark = (line) => {
-    const remarkPatterns = [
-      /remark[s]?:\s*(.*?)(?=\s*(?:\||$))/i,
-      /note[s]?:\s*(.*?)(?=\s*(?:\||$))/i,
-      /comment[s]?:\s*(.*?)(?=\s*(?:\||$))/i
-    ];
-
-    for (const pattern of remarkPatterns) {
-      const match = line.match(pattern);
-      if (match) return match[1].trim();
-    }
-
-    return '';
-  };
-
-  const extractBOLNumber = (line) => {
-    const bolPattern = /BOL[:#\s]+(\w+)/i;
-    const match = line.match(bolPattern);
-    return match ? match[1] : '';
-  };
-
-  const extractTrailerNumber = (line) => {
-    const trailerPattern = /trailer[:#\s]+(\w+)/i;
-    const match = line.match(trailerPattern);
-    return match ? match[1] : '';
   };
 
   return (
@@ -203,75 +151,73 @@ const processFile = async (file) => {
 
         {activeTab === 'upload' && (
           <div className="upload-section">
-            <div className="file-upload-container">
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                id="file-upload"
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="file-upload" className="select-file-button">
-                Select PDF File
-              </label>
-              {uploadedFile && (
-                <div className="file-info">
-                  Selected file: {uploadedFile.name}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'results' && (
-          <div className="results-section">
-            {parsedData ? (
-              <div className="parsed-data">
-                <h3>Analyzed Records:</h3>
-                {parsedData.map((record, index) => (
-                  <div key={index} className="record-item">
-                    <p>Time: {record.startTime.toLocaleString()} - {record.endTime.toLocaleString()}</p>
-                    <p>Status: {record.status}</p>
-                    <p>Location: {record.location}</p>
-                    {record.remark && <p>Remark: {record.remark}</p>}
-                    {record.bolNumber && <p>BOL: {record.bolNumber}</p>}
-                    {record.trailerNumber && <p>Trailer: {record.trailerNumber}</p>}
-                  </div>
-                ))}
-                
-                <h3>Violations Found:</h3>
-                {violations && Object.entries(violations).map(([type, items]) => (
-                  <div key={type} className="violation-type">
-                    <h4>{type.replace(/_/g, ' ').toUpperCase()}</h4>
-                    <ul className="violation-list">
-                      {items.map((violation, index) => (
-                        <li key={index} className="violation-item">
-                          <div className="violation-details">
-                            <p>Time: {new Date(violation.timestamp).toLocaleString()}</p>
-                            <p>Location: {violation.location}</p>
-                            <p>Duration: {violation.duration} minutes</p>
-                            {violation.remark && <p>Remark: {violation.remark}</p>}
-                            {violation.required && <p>Required: {violation.required} minutes</p>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handleFileUpload}
+              id="file-upload"
+              className="hidden"
+            />
+            <label htmlFor="file-upload" className="upload-button">
+              Select PDF File
+            </label>
+            {uploadedFile && (
+              <div className="file-info">
+                Selected file: {uploadedFile.name}
               </div>
-            ) : (
-              <div className="no-data">No data available</div>
             )}
           </div>
         )}
+
+{activeTab === 'results' && (
+  <div className="results-section">
+    {parsedData ? (
+      <div className="parsed-data">
+        <h3>Analyzed Records:</h3>
+        {parsedData.map((record, index) => (
+          <div key={index} className="record-item">
+            <p>Time: {record.startTime instanceof Date ? 
+                record.startTime.toLocaleString() : 
+                record.startTime}
+            </p>
+            <p>Status: {record.status}</p>
+            <p>Location: {record.location?.place || record.location || 'N/A'}</p>
+            {record.note && <p>Note: {record.note}</p>}
+          </div>
+        ))}
+
+        {violations && violations.length > 0 && (
+          <div className="violations-section">
+            <h3>Violations Found:</h3>
+            {violations.map((violation, index) => (
+              <div key={index} className="violation-item">
+                <p>Type: {violation.type}</p>
+                <p>Time: {violation.event.startTime instanceof Date ? 
+                    violation.event.startTime.toLocaleString() : 
+                    violation.event.startTime}
+                </p>
+                {violation.duration && 
+                  <p>Duration: {Math.round(violation.duration)} minutes</p>
+                }
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : (
+      <div className="no-data">No data available</div>
+    )}
+  </div>
+)}
 
         {activeTab === 'visualization' && (
           <div className="visualization-section">
             {parsedData ? (
               <div className="visualization">
-                <h3>Timeline Visualization</h3>
-                <Timeline data={parsedData} />
-                {/* Add visualization implementation */}
+                <h3>Event Timeline</h3>
+                <div className="timeline-container">
+                  {/* Timeline visualization will be implemented here */}
+                </div>
               </div>
             ) : (
               <div className="no-data">No data to visualize</div>
