@@ -1,5 +1,5 @@
 import React from 'react';
-import ELDParser from './styles/ELDParser.css';
+import ELDParser from './ELDParser';
 import './styles/App.css';
 
 function App() {
